@@ -341,6 +341,49 @@ func (fc *FastmailClient) GetAliases(domain string) ([]MaskedEmailInfo, error) {
 	return filteredAliases, nil
 }
 
+// parseCreatedAlias extracts the created alias from a JMAP response
+func (fc *FastmailClient) parseCreatedAlias(response *MaskedEmailResponse) (*MaskedEmailInfo, error) {
+	// Validate response structure before accessing
+	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+		return nil, err
+	}
+
+	var createdAlias struct {
+		Created struct {
+			MaskedEmail MaskedEmailInfo `json:"MaskedEmail"`
+		} `json:"created"`
+	}
+
+	err := json.Unmarshal(response.MethodResponses[0][1], &createdAlias)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal created alias: %w", err)
+	}
+
+	return &createdAlias.Created.MaskedEmail, nil
+}
+
+// parseUpdatedAlias verifies that an alias update was successful
+func (fc *FastmailClient) parseUpdatedAlias(response *MaskedEmailResponse, aliasID string) error {
+	// Validate response structure before accessing
+	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+		return err
+	}
+
+	// Verify the update was successful
+	var updateResponse struct {
+		Updated map[string]interface{} `json:"updated"`
+	}
+	if err := json.Unmarshal(response.MethodResponses[0][1], &updateResponse); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if _, ok := updateResponse.Updated[aliasID]; !ok {
+		return fmt.Errorf("server did not confirm the update")
+	}
+
+	return nil
+}
+
 func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 	create := map[string]interface{}{
 		"MaskedEmail": map[string]string{
@@ -354,23 +397,7 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 		return nil, err
 	}
 
-	// Validate response structure before accessing
-	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
-		return nil, err
-	}
-
-	var createdAlias struct {
-		Created struct {
-			MaskedEmail MaskedEmailInfo `json:"MaskedEmail"`
-		} `json:"created"`
-	}
-
-	err = json.Unmarshal(response.MethodResponses[0][1], &createdAlias)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal created alias: %w", err)
-	}
-
-	return &createdAlias.Created.MaskedEmail, nil
+	return fc.parseCreatedAlias(response)
 }
 
 // GetAliasByEmail retrieves a specific alias by its email address.
@@ -411,21 +438,8 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 		return fmt.Errorf("failed to update alias: %w", err)
 	}
 
-	// Validate response structure before accessing
-	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+	if err := fc.parseUpdatedAlias(response, alias.ID); err != nil {
 		return err
-	}
-
-	// Verify the update was successful
-	var updateResponse struct {
-		Updated map[string]interface{} `json:"updated"`
-	}
-	if err := json.Unmarshal(response.MethodResponses[0][1], &updateResponse); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if _, ok := updateResponse.Updated[alias.ID]; !ok {
-		return fmt.Errorf("server did not confirm the update")
 	}
 
 	fmt.Println("Success")

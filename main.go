@@ -196,7 +196,7 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 	if enable || disable || delete {
 		return handleStateUpdate(client, identifier, enable, disable, delete)
 	}
-	return handleAliasCreation(client, identifier)
+	return handleAliasLookupOrCreation(client, identifier)
 }
 
 // handleStateUpdate manages the state changes of existing aliases
@@ -224,8 +224,8 @@ func handleStateUpdate(client *FastmailClient, identifier string, enable, disabl
 	return nil
 }
 
-// Handle get/create alias
-func handleAliasCreation(client *FastmailClient, identifier string) error {
+// handleAliasLookupOrCreation handles alias lookup and creation if needed
+func handleAliasLookupOrCreation(client *FastmailClient, identifier string) error {
 	aliases, err := client.GetAliases(identifier)
 	if err != nil {
 		return fmt.Errorf("failed to get aliases: %w", err)

@@ -55,3 +55,38 @@ func TestDomainsEqual(t *testing.T) {
 		t.Fatalf("domainsEqual should treat ports as equivalent")
 	}
 }
+
+func TestPrepareDomainInput(t *testing.T) {
+	display, normalized, err := prepareDomainInput(" Example.com/login ")
+	if err != nil {
+		t.Fatalf("prepareDomainInput returned error: %v", err)
+	}
+	if display != "Example.com/login" {
+		t.Fatalf("prepareDomainInput display = %q, want %q", display, "Example.com/login")
+	}
+	if normalized != "https://example.com" {
+		t.Fatalf("prepareDomainInput normalized = %q, want %q", normalized, "https://example.com")
+	}
+
+	if _, _, err := prepareDomainInput("user@example.com"); err == nil {
+		t.Fatalf("prepareDomainInput should error on email addresses")
+	}
+
+	if _, _, err := prepareDomainInput("   "); err == nil {
+		t.Fatalf("prepareDomainInput should error on empty input")
+	}
+}
+
+func TestNormalizeEmailInput(t *testing.T) {
+	email, err := normalizeEmailInput(" user@example.com ")
+	if err != nil {
+		t.Fatalf("normalizeEmailInput returned error: %v", err)
+	}
+	if email != "user@example.com" {
+		t.Fatalf("normalizeEmailInput = %q, want %q", email, "user@example.com")
+	}
+
+	if _, err := normalizeEmailInput("example.com"); err == nil {
+		t.Fatalf("normalizeEmailInput should error on domains")
+	}
+}

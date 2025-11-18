@@ -8,4 +8,3 @@ var (
 	embeddedCommit  = "none"
 	embeddedDate    = "unknown"
 )
-

@@ -32,7 +32,7 @@ func TestAliasMatchesDomain(t *testing.T) {
 	}
 
 	if !aliasMatchesDomain(MaskedEmailInfo{
-		ForDomain:   "https://Example.com/signup",
+		ForDomain: "https://Example.com/signup",
 	}, target) {
 		t.Fatalf("expected ForDomain to match (casing and trailing slash should be ignored)")
 	}

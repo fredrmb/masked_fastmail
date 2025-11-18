@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -145,10 +146,11 @@ const (
 )
 
 type MaskedEmailInfo struct {
-	Email     string     `json:"email"`
-	ForDomain string     `json:"forDomain"`
-	State     AliasState `json:"state"`
-	ID        string     `json:"id"`
+	Email       string     `json:"email"`
+	ForDomain   string     `json:"forDomain"`
+	State       AliasState `json:"state"`
+	Description string     `json:"description"`
+	ID          string     `json:"id"`
 }
 
 // MaskedEmailCreate defines the payload for creating a masked email
@@ -377,14 +379,23 @@ func (fc *FastmailClient) validateMethodResponse(response *MaskedEmailResponse, 
 }
 
 func (fc *FastmailClient) GetAliases(domain string) ([]MaskedEmailInfo, error) {
-	maskedEmails, err := fc.getMaskedEmail([]string{"email", "forDomain", "state"})
+	targetDomain, err := normalizeOrigin(domain)
+	if err != nil {
+		return nil, err
+	}
+
+	maskedEmails, err := fc.getMaskedEmail([]string{"email", "forDomain", "state", "description"})
 	if err != nil {
 		return nil, err
 	}
 
 	var filteredAliases []MaskedEmailInfo
 	for _, alias := range maskedEmails {
-		if alias.ForDomain == domain && alias.State != AliasDeleted {
+		if alias.State == AliasDeleted {
+			continue
+		}
+
+		if aliasMatchesDomain(alias, targetDomain) {
 			filteredAliases = append(filteredAliases, alias)
 		}
 	}
@@ -435,11 +446,16 @@ func (fc *FastmailClient) parseUpdatedAlias(response *MaskedEmailResponse, alias
 	return nil
 }
 
-func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
+func (fc *FastmailClient) CreateAlias(domain string, description string) (*MaskedEmailInfo, error) {
+	targetDomain, err := normalizeOrigin(domain)
+	if err != nil {
+		return nil, err
+	}
+
 	create := map[string]MaskedEmailCreate{
 		"MaskedEmail": {
-			ForDomain:   domain,
-			Description: domain,
+			ForDomain:   targetDomain,
+			Description: targetDomain,
 		},
 	}
 
@@ -454,7 +470,7 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 // GetAliasByEmail retrieves a specific alias by its email address.
 // Returns ErrAliasNotFound if the alias doesn't exist.
 func (fc *FastmailClient) GetAliasByEmail(email string) (*MaskedEmailInfo, error) {
-	aliases, err := fc.getMaskedEmail([]string{"email", "state", "forDomain", "id"})
+	aliases, err := fc.getMaskedEmail([]string{"email", "state", "forDomain", "id", "description"})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aliases: %w", err)
 	}
@@ -495,4 +511,16 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 
 	fmt.Println("Success")
 	return nil
+}
+
+func aliasMatchesDomain(alias MaskedEmailInfo, targetDomain string) bool {
+	if domainsEqual(alias.ForDomain, targetDomain) {
+		return true
+	}
+
+	if strings.TrimSpace(alias.ForDomain) == "" {
+		return domainsEqual(alias.Description, targetDomain)
+	}
+
+	return false
 }

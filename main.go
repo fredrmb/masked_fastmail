@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/atotto/clipboard"
@@ -226,7 +227,13 @@ func handleStateUpdate(client *FastmailClient, identifier string, enable, disabl
 
 // handleAliasLookupOrCreation handles alias lookup and creation if needed
 func handleAliasLookupOrCreation(client *FastmailClient, identifier string) error {
-	aliases, err := client.GetAliases(identifier)
+	displayInput := strings.TrimSpace(identifier)
+	normalizedDomain, err := normalizeOrigin(displayInput)
+	if err != nil {
+		return err
+	}
+
+	aliases, err := client.GetAliases(normalizedDomain)
 	if err != nil {
 		return fmt.Errorf("failed to get aliases: %w", err)
 	}
@@ -234,14 +241,14 @@ func handleAliasLookupOrCreation(client *FastmailClient, identifier string) erro
 
 	if selectedAlias == nil {
 		// Create new alias
-		fmt.Printf("No alias found for %s, creating new one...\n", identifier)
-		newAlias, err := client.CreateAlias(identifier)
+		fmt.Printf("No alias found for %s, creating new one...\n", normalizedDomain)
+		newAlias, err := client.CreateAlias(normalizedDomain, displayInput)
 		if err != nil {
 			return fmt.Errorf("failed to create alias: %w", err)
 		}
 		selectedAlias = newAlias
 	} else if len(aliases) > 1 {
-		fmt.Printf("Found %d aliases for %s:\n", len(aliases), identifier)
+		fmt.Printf("Found %d aliases for %s:\n", len(aliases), normalizedDomain)
 		for _, alias := range aliases {
 			fmt.Printf("- %s (state: %s)\n", alias.Email, alias.State)
 		}

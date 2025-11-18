@@ -45,12 +45,14 @@ changelog:
     - title: Fixes
       regexp: "^fix:"
       order: 1
+    - title: Documentation
+      regexp: "^docs:"
+      order: 2
+    - title: Chores and refactoring
+      regexp: "^chore:|refactor:"
+      order: 3
+    - title: CI and testing
+      regexp: "^ci:|test:"
+      order: 4
     - title: Others
       order: 999
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^ci:"
-      - "^chore:"
-      - "^refactor:"

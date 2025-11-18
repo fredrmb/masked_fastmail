@@ -42,7 +42,7 @@ changelog:
     - title: Features
       regexp: "^feat:"
       order: 0
-    - title: Bug Fixes
+    - title: Bug fixes
       regexp: "^fix:"
       order: 1
     - title: Others

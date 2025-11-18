@@ -95,11 +95,11 @@ func (fc *FastmailClient) getMaskedEmail(properties []string) ([]MaskedEmailInfo
 }
 
 // setMaskedEmail performs a MaskedEmail/set request with the given updates or creates
-func (fc *FastmailClient) setMaskedEmail(create, update map[string]interface{}) (*MaskedEmailResponse, error) {
+func (fc *FastmailClient) setMaskedEmail(create map[string]MaskedEmailCreate, update map[string]MaskedEmailUpdate) (*MaskedEmailResponse, error) {
 	args := struct {
-		Create    map[string]interface{} `json:"create,omitempty"`
-		Update    map[string]interface{} `json:"update,omitempty"`
-		AccountID string                 `json:"accountId"`
+		Create    map[string]MaskedEmailCreate `json:"create,omitempty"`
+		Update    map[string]MaskedEmailUpdate `json:"update,omitempty"`
+		AccountID string                       `json:"accountId"`
 	}{
 		AccountID: fc.AccountID,
 		Create:    create,
@@ -149,6 +149,17 @@ type MaskedEmailInfo struct {
 	ForDomain string     `json:"forDomain"`
 	State     AliasState `json:"state"`
 	ID        string     `json:"id"`
+}
+
+// MaskedEmailCreate defines the payload for creating a masked email
+type MaskedEmailCreate struct {
+	ForDomain   string `json:"forDomain"`
+	Description string `json:"description"`
+}
+
+// MaskedEmailUpdate defines the payload for updating a masked email
+type MaskedEmailUpdate struct {
+	State AliasState `json:"state"`
 }
 
 // methodCall represents a JMAP method call
@@ -329,8 +340,8 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 				}
 				// If we can't parse the error structure, return the raw JSON
 				return &APIError{
-					Type:        "unknown",
-					Message:     fmt.Sprintf("JMAP error in method '%s': %s", methodName, string(methodResponse[1])),
+					Type:         "unknown",
+					Message:      fmt.Sprintf("JMAP error in method '%s': %s", methodName, string(methodResponse[1])),
 					ResponseBody: string(methodResponse[1]),
 				}
 			}
@@ -425,10 +436,10 @@ func (fc *FastmailClient) parseUpdatedAlias(response *MaskedEmailResponse, alias
 }
 
 func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
-	create := map[string]interface{}{
-		"MaskedEmail": map[string]string{
-			"forDomain":   domain,
-			"description": domain,
+	create := map[string]MaskedEmailCreate{
+		"MaskedEmail": {
+			ForDomain:   domain,
+			Description: domain,
 		},
 	}
 
@@ -467,9 +478,9 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 		return fmt.Errorf("failed to update alias: '%s' is already '%s'", alias.Email, state)
 	}
 
-	update := map[string]interface{}{
-		alias.ID: map[string]string{
-			"state": string(state),
+	update := map[string]MaskedEmailUpdate{
+		alias.ID: {
+			State: state,
 		},
 	}
 

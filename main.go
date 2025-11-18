@@ -18,6 +18,10 @@ var (
 	date    = "unknown"
 )
 
+const (
+	shortCommitLength = 7 // length of short commit hash
+)
+
 // initVersionInfo attempts to populate version information from Go's build info
 // when installed via `go install`. This is a fallback when ldflags are not set.
 func initVersionInfo() {
@@ -45,8 +49,8 @@ func initVersionInfo() {
 		switch setting.Key {
 		case "vcs.revision":
 			if setting.Value != "" {
-				if len(setting.Value) >= 7 {
-					commit = setting.Value[:7]
+				if len(setting.Value) >= shortCommitLength {
+					commit = setting.Value[:shortCommitLength]
 				} else {
 					commit = setting.Value
 				}

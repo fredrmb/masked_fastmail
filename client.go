@@ -19,6 +19,11 @@ const (
 	methodSet            = "MaskedEmail/set"
 )
 
+const (
+	defaultHTTPTimeout = 30 * time.Second
+	jmapErrorSuffixLen = 6 // length of "/error" suffix
+)
+
 // ErrAliasNotFound is returned when an alias cannot be found
 var ErrAliasNotFound = errors.New("alias not found")
 
@@ -174,7 +179,7 @@ func NewFastmailClient(debug bool) (*FastmailClient, error) {
 		Token:     token,
 		Debug:     debug,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 	}, nil
 }
@@ -282,7 +287,7 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 		}
 
 		// JMAP error responses have method names ending with "/error"
-		if len(methodName) > 6 && methodName[len(methodName)-6:] == "/error" {
+		if len(methodName) > jmapErrorSuffixLen && methodName[len(methodName)-jmapErrorSuffixLen:] == "/error" {
 			// Try to extract error details
 			if len(methodResponse) > 1 {
 				var jmapError JMAPError

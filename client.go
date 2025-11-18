@@ -32,7 +32,7 @@ type FastmailClient struct {
 
 // getMaskedEmail performs a MaskedEmail/get request with the given properties
 func (fc *FastmailClient) getMaskedEmail(properties []string) ([]MaskedEmailInfo, error) {
-	payload := fc.buildRequest(methodCall{
+	payload, err := fc.buildRequest(methodCall{
 		name: methodGet,
 		arguments: struct {
 			AccountID  string   `json:"accountId"`
@@ -43,10 +43,18 @@ func (fc *FastmailClient) getMaskedEmail(properties []string) ([]MaskedEmailInfo
 		},
 		clientID: nil,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	response, err := fc.sendRequest(payload)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate response structure before accessing
+	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
+		return nil, fmt.Errorf("invalid response structure: missing method response data")
 	}
 
 	var responseData struct {
@@ -71,11 +79,14 @@ func (fc *FastmailClient) setMaskedEmail(create, update map[string]interface{}) 
 		Update:    update,
 	}
 
-	payload := fc.buildRequest(methodCall{
+	payload, err := fc.buildRequest(methodCall{
 		name:      methodSet,
 		arguments: args,
 		clientID:  nil,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return fc.sendRequest(payload)
 }
@@ -87,6 +98,13 @@ type MaskedEmailRequest struct {
 
 type MaskedEmailResponse struct {
 	MethodResponses [][]json.RawMessage `json:"methodResponses"`
+	MethodErrors    []interface{}       `json:"methodErrors,omitempty"`
+}
+
+// JMAPError represents a JMAP method error
+type JMAPError struct {
+	Type    string `json:"type"`
+	Message string `json:"message,omitempty"`
 }
 
 // AliasState represents the possible states of a masked email
@@ -113,13 +131,22 @@ type methodCall struct {
 	name      string
 }
 
-func (fc *FastmailClient) buildRequest(calls ...methodCall) *MaskedEmailRequest {
+func (fc *FastmailClient) buildRequest(calls ...methodCall) (*MaskedEmailRequest, error) {
 	methodCalls := make([][]json.RawMessage, len(calls))
 
 	for i, call := range calls {
-		name, _ := json.Marshal(call.name)
-		args, _ := json.Marshal(call.arguments)
-		clientID, _ := json.Marshal(call.clientID)
+		name, err := json.Marshal(call.name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal method name: %w", err)
+		}
+		args, err := json.Marshal(call.arguments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal method arguments: %w", err)
+		}
+		clientID, err := json.Marshal(call.clientID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal client ID: %w", err)
+		}
 
 		methodCalls[i] = []json.RawMessage{name, args, clientID}
 	}
@@ -127,7 +154,7 @@ func (fc *FastmailClient) buildRequest(calls ...methodCall) *MaskedEmailRequest 
 	return &MaskedEmailRequest{
 		Using:       []string{"urn:ietf:params:jmap:core", "https://www.fastmail.com/dev/maskedemail"},
 		MethodCalls: methodCalls,
-	}
+	}, nil
 }
 
 // NewFastmailClient creates a new client for interacting with the Fastmail API.
@@ -200,13 +227,70 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 		return nil, fmt.Errorf("HTTP error %d: %s\nResponse body: %s", resp.StatusCode, resp.Status, string(body))
 	}
 
+	// Check for empty response body
+	if len(body) == 0 {
+		return nil, fmt.Errorf("received empty response body")
+	}
+
 	var result MaskedEmailResponse
 	err = json.Unmarshal(body, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON response: %w\nResponse body: %s", err, string(body))
 	}
 
+	// Validate JMAP error responses
+	if err := fc.validateJMAPResponse(&result); err != nil {
+		return nil, err
+	}
+
 	return &result, nil
+}
+
+// validateJMAPResponse checks for JMAP errors in the response
+func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) error {
+	// Check for top-level methodErrors
+	if len(response.MethodErrors) > 0 {
+		return fmt.Errorf("JMAP method errors in response: %v", response.MethodErrors)
+	}
+
+	// Check if MethodResponses is empty
+	if len(response.MethodResponses) == 0 {
+		return fmt.Errorf("empty MethodResponses array in JMAP response")
+	}
+
+	// Check each method response for errors
+	for i, methodResponse := range response.MethodResponses {
+		if len(methodResponse) == 0 {
+			return fmt.Errorf("empty method response at index %d", i)
+		}
+
+		// Check if method name indicates an error (e.g., "MaskedEmail/get/error")
+		var methodName string
+		if err := json.Unmarshal(methodResponse[0], &methodName); err != nil {
+			return fmt.Errorf("failed to unmarshal method name at index %d: %w", i, err)
+		}
+
+		// JMAP error responses have method names ending with "/error"
+		if len(methodName) > 6 && methodName[len(methodName)-6:] == "/error" {
+			// Try to extract error details
+			if len(methodResponse) > 1 {
+				var jmapError JMAPError
+				if err := json.Unmarshal(methodResponse[1], &jmapError); err == nil {
+					return fmt.Errorf("JMAP error: %s - %s", jmapError.Type, jmapError.Message)
+				}
+				// If we can't parse the error structure, return the raw JSON
+				return fmt.Errorf("JMAP error in method '%s': %s", methodName, string(methodResponse[1]))
+			}
+			return fmt.Errorf("JMAP error in method '%s'", methodName)
+		}
+
+		// Validate that the response has at least method name and response data
+		if len(methodResponse) < 2 {
+			return fmt.Errorf("invalid method response structure at index %d: expected at least 2 elements, got %d", i, len(methodResponse))
+		}
+	}
+
+	return nil
 }
 
 func (fc *FastmailClient) GetAliases(domain string) ([]MaskedEmailInfo, error) {
@@ -238,6 +322,11 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 		return nil, err
 	}
 
+	// Validate response structure before accessing
+	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
+		return nil, fmt.Errorf("invalid response structure: missing method response data")
+	}
+
 	var createdAlias struct {
 		Created struct {
 			MaskedEmail MaskedEmailInfo `json:"MaskedEmail"`
@@ -246,7 +335,7 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 
 	err = json.Unmarshal(response.MethodResponses[0][1], &createdAlias)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal created alias: %w", err)
 	}
 
 	return &createdAlias.Created.MaskedEmail, nil
@@ -289,6 +378,11 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 	response, err := fc.setMaskedEmail(nil, update)
 	if err != nil {
 		return fmt.Errorf("failed to update alias: %w", err)
+	}
+
+	// Validate response structure before accessing
+	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
+		return fmt.Errorf("invalid response structure: missing method response data")
 	}
 
 	// Verify the update was successful

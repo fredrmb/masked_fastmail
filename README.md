@@ -1,13 +1,17 @@
 # Masked Fastmail
 
 A simple CLI tool for managing [Fastmail masked email aliases](https://www.fastmail.com/features/masked-email/).
-Easily create new aliases for websites or manage existing ones.
+
+Easily create new aliases for websites and manage existing ones.
+
+> This project is still under development and may contain bugs.
+> It's a personal project and not in any way affiliated with Fastmail.
 
 ## Features
 
 - Get or create masked email addresses for domains
 - Aliases are automatically copied to clipboard
-- Enable/disable/delete aliases
+- Enable, disable and delete aliases
 
 ## Usage
 
@@ -88,8 +92,39 @@ go install github.com/fredrikrab/masked_fastmail@latest
 
 #### API documentation
 
-- The API documentation can be found at [https://www.fastmail.com/dev/maskedemail](https://www.fastmail.com/dev/maskedemail)
+- The API documentation can be found at [https://www.fastmail.com/dev/](https://www.fastmail.com/dev/)
 - It's also helpful to review the [JMAP protocol](https://jmap.io/crash-course.html)
+
+## Development
+
+### Prerequisites
+
+- Go 1.22+ (see [Installation](#installation) for details)
+- [VHS](https://github.com/charmbracelet/vhs) (for generating demo GIF)
+
+### Building and running
+
+Build the binary:
+
+```shell
+go build -o masked_fastmail
+```
+
+Run with debug output to see raw API requests and responses:
+
+```shell
+./masked_fastmail --debug example.com
+```
+
+### Generating demo GIF
+
+The `demo.gif` is generated using [VHS](https://github.com/charmbracelet/vhs). Install VHS and run:
+
+```shell
+vhs cassette.tape
+```
+
+This will generate a new `demo.gif` file based on the commands in `cassette.tape`.
 
 ## License
 

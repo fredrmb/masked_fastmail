@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -164,10 +165,10 @@ func selectPreferredAlias(aliases []MaskedEmailInfo) *MaskedEmailInfo {
 	}
 
 	selected := &aliases[0]
-	selectedPriority := statePriority[selected.State]
+	selectedPriority := getStatePriority(selected.State)
 
 	for i := 1; i < len(aliases); i++ {
-		priority := statePriority[aliases[i].State]
+		priority := getStatePriority(aliases[i].State)
 		if priority < selectedPriority {
 			selected = &aliases[i]
 			selectedPriority = priority
@@ -175,6 +176,13 @@ func selectPreferredAlias(aliases []MaskedEmailInfo) *MaskedEmailInfo {
 	}
 
 	return selected
+}
+
+func getStatePriority(state AliasState) int {
+	if priority, ok := statePriority[state]; ok {
+		return priority
+	}
+	return math.MaxInt
 }
 
 // runMaskedFastmail is the main command handler for the CLI application.

@@ -59,3 +59,38 @@ func domainsEqual(a, b string) bool {
 	trimB := strings.TrimRight(strings.ToLower(strings.TrimSpace(b)), "/")
 	return trimA == trimB
 }
+
+// prepareDomainInput trims the user-provided identifier, ensures it is a domain
+// (not an email address), and returns both the trimmed display value and the
+// normalized domain used for API calls.
+func prepareDomainInput(input string) (string, string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", "", fmt.Errorf("domain cannot be empty")
+	}
+	if looksLikeEmail(trimmed) {
+		return "", "", fmt.Errorf("expected a domain but received an email address: %s", trimmed)
+	}
+
+	normalized, err := normalizeOrigin(trimmed)
+	if err != nil {
+		return "", "", err
+	}
+	return trimmed, normalized, nil
+}
+
+// normalizeEmailInput trims and validates an email identifier.
+func normalizeEmailInput(input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", fmt.Errorf("alias email cannot be empty")
+	}
+	if !looksLikeEmail(trimmed) {
+		return "", fmt.Errorf("expected an alias email address, got %s", trimmed)
+	}
+	return trimmed, nil
+}
+
+func looksLikeEmail(input string) bool {
+	return strings.Count(input, "@") == 1 && !strings.ContainsAny(input, " \t")
+}

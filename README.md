@@ -81,6 +81,14 @@ This causes all new new emails to be moved to trash.
 masked_fastmail --disable user.1234@fastmail.com
 ```
 
+#### Delete an alias
+
+This causes all new emails to bounce.
+
+```shell
+masked_fastmail --delete user.1234@fastmail.com
+```
+
 #### List aliases for a domain
 
 Prints all known aliases for the site without creating a new one or copying to the clipboard. Results whose `forDomain` matches the normalized input are listed first, followed by aliases where the search text appears in the `email`, `description`, or `forDomain` fields.

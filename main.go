@@ -11,6 +11,7 @@ import (
 )
 
 // Version information
+// (set via ldflags during build, or extracted from build info)
 var (
 	version = "dev"
 	commit  = "none"
@@ -25,34 +26,62 @@ func initVersionInfo() {
 		return
 	}
 
-	// Try to get version info from Go's build info (available when installed via go install)
-	if info, ok := debug.ReadBuildInfo(); ok {
-		// Extract version from module path
-		if info.Main.Version != "" && info.Main.Version != "(devel)" {
-			version = info.Main.Version
-		}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		// No build info available, try embedded version info as last resort
+		checkEmbeddedVersionInfo()
+		return
+	}
 
-		// Extract commit hash and build time from build settings
-		for _, setting := range info.Settings {
-			switch setting.Key {
-			case "vcs.revision":
-				if setting.Value != "" {
-					// Use short commit hash (first 7 characters)
-					if len(setting.Value) >= 7 {
-						commit = setting.Value[:7]
-					} else {
-						commit = setting.Value
-					}
+	// Get version from module
+	if info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
+
+	// Get VCS info from build settings (only available when building from git repo)
+	// VCS settings take priority over embedded info since they're always current
+	hasVCSInfo := false
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			if setting.Value != "" {
+				if len(setting.Value) >= 7 {
+					commit = setting.Value[:7]
+				} else {
+					commit = setting.Value
 				}
-			case "vcs.time":
-				if setting.Value != "" {
-					// Parse and format the time
-					if t, err := time.Parse(time.RFC3339, setting.Value); err == nil {
-						date = t.Format("2006-01-02T15:04:05Z")
-					}
+				hasVCSInfo = true
+			}
+		case "vcs.time":
+			if setting.Value != "" {
+				// Parse and format the time
+				if t, err := time.Parse(time.RFC3339, setting.Value); err == nil {
+					date = t.Format("2006-01-02T15:04:05Z")
+					hasVCSInfo = true
 				}
 			}
 		}
+	}
+
+	// Only use embedded version info if VCS info is not available
+	// (e.g., when installing from a remote module without git context)
+	if !hasVCSInfo {
+		checkEmbeddedVersionInfo()
+	}
+}
+
+// checkEmbeddedVersionInfo checks for version info embedded by GitHub Actions
+// during the release process. This is used when building from a remote module
+// where VCS information is not available.
+func checkEmbeddedVersionInfo() {
+	if embeddedVersion != "" && embeddedVersion != "dev" {
+		version = embeddedVersion
+	}
+	if embeddedCommit != "" && embeddedCommit != "none" {
+		commit = embeddedCommit
+	}
+	if embeddedDate != "" && embeddedDate != "unknown" {
+		date = embeddedDate
 	}
 }
 
@@ -65,7 +94,7 @@ var statePriority = map[AliasState]int{
 }
 
 func main() {
-	// Initialize version info from build info if ldflags weren't set
+	// Initialize version info from build info (fallback when ldflags aren't set)
 	initVersionInfo()
 
 	rootCmd := &cobra.Command{

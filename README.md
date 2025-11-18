@@ -80,7 +80,7 @@ Download the latest release from the [releases page](https://github.com/fredrmb/
 go install github.com/fredrmb/masked_fastmail@latest
 ```
 
-When installed via `go install`, version information is automatically extracted from Go's build metadata. You can verify the installation and check the version by running:
+You can verify the installation and check the version by running:
 
 ```shell
 masked_fastmail --version
@@ -125,6 +125,21 @@ go build -o masked_fastmail
 ```
 
 The `build.sh` script automatically sets version information from git (version tag, commit hash, and build date), which will be displayed when running `./masked_fastmail --version`.
+
+#### Note about `go install` and version info
+
+When installed via `go install`, version information is automatically embedded in the source code as part of the release process. This means `go install github.com/fredrmb/masked_fastmail@latest` will include:
+- **Version**: Release tag (e.g., `v1.2.3`)
+- **Commit**: Short commit hash of the tagged release
+- **Build date**: Timestamp when the release was created
+
+The version information is extracted using the following priority:
+1. **Ldflags** (from `build.sh` or GoReleaser) - takes precedence if set
+2. **VCS build settings** - commit/date when building from git repo (always current for local builds)
+3. **Go build info** - version tag from module metadata
+4. **Embedded version info** (from `version_info.go`, updated during release workflow) - used when VCS info is unavailable (e.g., `go install` from remote module)
+
+### Run with debug output
 
 Run with debug output to see raw API requests and responses:
 

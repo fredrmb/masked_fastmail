@@ -35,6 +35,7 @@ type FastmailClient struct {
 }
 
 // getMaskedEmail performs a MaskedEmail/get request with the given properties
+// Note: The API does not support server-side filtering, so we filter the results client-side.
 func (fc *FastmailClient) getMaskedEmail(properties []string) ([]MaskedEmailInfo, error) {
 	payload, err := fc.buildRequest(methodCall{
 		name: methodGet,

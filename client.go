@@ -151,17 +151,23 @@ const (
 )
 
 type MaskedEmailInfo struct {
-	Email       string     `json:"email"`
-	ForDomain   string     `json:"forDomain"`
-	State       AliasState `json:"state"`
-	Description string     `json:"description"`
-	ID          string     `json:"id"`
+	ID            string     `json:"id"`
+	Email         string     `json:"email"`
+	State         AliasState `json:"state"`
+	ForDomain     string     `json:"forDomain"`
+	Description   string     `json:"description"`
+	CreatedBy     string     `json:"createdBy"`
+	URL           string     `json:"url,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	LastMessageAt *time.Time `json:"lastMessageAt,omitempty"`
 }
 
 // MaskedEmailCreate defines the payload for creating a masked email
 type MaskedEmailCreate struct {
 	ForDomain   string `json:"forDomain"`
 	Description string `json:"description"`
+	URL         string `json:"url,omitempty"`
+	EmailPrefix string `json:"emailPrefix,omitempty"`
 }
 
 // MaskedEmailUpdate defines the payload for updating a masked email

@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
@@ -264,12 +265,41 @@ func handleAliasList(client *FastmailClient, identifier string) error {
 	}
 
 	fmt.Printf("Aliases for %s:\n", normalizedDomain)
+
+	type aliasRow struct {
+		email       string
+		state       string
+		description string
+	}
+
+	rows := make([]aliasRow, 0, len(aliases))
+	maxEmailWidth := 0
+	maxStateWidth := 0
+
 	for _, alias := range aliases {
 		description := alias.Description
 		if strings.TrimSpace(description) == "" {
 			description = "(no description)"
 		}
-		fmt.Printf("- %s  state: %s  description: %s\n", alias.Email, alias.State, description)
+
+		row := aliasRow{
+			email:       alias.Email,
+			state:       string(alias.State),
+			description: description,
+		}
+		rows = append(rows, row)
+
+		if emailWidth := utf8.RuneCountInString(row.email); emailWidth > maxEmailWidth {
+			maxEmailWidth = emailWidth
+		}
+		if stateWidth := utf8.RuneCountInString(row.state); stateWidth > maxStateWidth {
+			maxStateWidth = stateWidth
+		}
+	}
+
+	format := fmt.Sprintf("- %%-%ds  state: %%-%ds  description: %%s\n", maxEmailWidth, maxStateWidth)
+	for _, row := range rows {
+		fmt.Printf(format, row.email, row.state, row.description)
 	}
 
 	return nil

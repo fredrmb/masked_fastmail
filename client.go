@@ -22,9 +22,6 @@ const (
 // ErrAliasNotFound is returned when an alias cannot be found
 var ErrAliasNotFound = errors.New("alias not found")
 
-// ErrUpdateFailed is returned when an alias update fails
-var ErrUpdateFailed = errors.New("failed to update alias")
-
 type FastmailClient struct {
 	AccountID string
 	Token     string
@@ -371,7 +368,6 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 	return &createdAlias.Created.MaskedEmail, nil
 }
 
-// GetAliasByEmail returns a specific alias by its email address
 // GetAliasByEmail retrieves a specific alias by its email address.
 // Returns ErrAliasNotFound if the alias doesn't exist.
 func (fc *FastmailClient) GetAliasByEmail(email string) (*MaskedEmailInfo, error) {

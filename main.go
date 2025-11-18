@@ -176,8 +176,6 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("exactly one URL or alias must be specified\n\n%s", cmd.UsageString())
 	}
 
-	// Note: We can remove this validation since we're using cobra's MarkFlagsMutuallyExclusive
-
 	debug, _ := cmd.Flags().GetBool("debug")
 	client, err := NewFastmailClient(debug)
 	if err != nil {

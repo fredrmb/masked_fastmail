@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
 
 // JMAP API endpoints and methods
@@ -28,6 +29,7 @@ type FastmailClient struct {
 	AccountID string
 	Token     string
 	Debug     bool
+	client    *http.Client
 }
 
 // getMaskedEmail performs a MaskedEmail/get request with the given properties
@@ -174,6 +176,9 @@ func NewFastmailClient(debug bool) (*FastmailClient, error) {
 		AccountID: accountID,
 		Token:     token,
 		Debug:     debug,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}, nil
 }
 
@@ -199,8 +204,7 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", fc.Token))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := fc.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

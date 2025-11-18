@@ -125,7 +125,7 @@ func (fc *FastmailClient) buildRequest(calls ...methodCall) *MaskedEmailRequest 
 	}
 
 	return &MaskedEmailRequest{
-		Using:       []string{"https://www.fastmail.com/dev/maskedemail"},
+		Using:       []string{"urn:ietf:params:jmap:core", "https://www.fastmail.com/dev/maskedemail"},
 		MethodCalls: methodCalls,
 	}
 }

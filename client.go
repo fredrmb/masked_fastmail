@@ -235,7 +235,7 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 
 	// Check for empty response body
 	if len(body) == 0 {
-		return nil, fmt.Errorf("received empty response body")
+		return nil, fmt.Errorf("failed to receive response: empty response body")
 	}
 
 	var result MaskedEmailResponse
@@ -266,18 +266,18 @@ func redactToken(token string) string {
 func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) error {
 	// Check for top-level methodErrors
 	if len(response.MethodErrors) > 0 {
-		return fmt.Errorf("JMAP method errors in response: %v", response.MethodErrors)
+		return fmt.Errorf("failed to process JMAP response: method errors: %v", response.MethodErrors)
 	}
 
 	// Check if MethodResponses is empty
 	if len(response.MethodResponses) == 0 {
-		return fmt.Errorf("empty MethodResponses array in JMAP response")
+		return fmt.Errorf("failed to process JMAP response: empty MethodResponses array")
 	}
 
 	// Check each method response for errors
 	for i, methodResponse := range response.MethodResponses {
 		if len(methodResponse) == 0 {
-			return fmt.Errorf("empty method response at index %d", i)
+			return fmt.Errorf("failed to process JMAP response: empty method response at index %d", i)
 		}
 
 		// Check if method name indicates an error (e.g., "MaskedEmail/get/error")
@@ -302,7 +302,7 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 
 		// Validate that the response has at least method name and response data
 		if len(methodResponse) < 2 {
-			return fmt.Errorf("invalid method response structure at index %d: expected at least 2 elements, got %d", i, len(methodResponse))
+			return fmt.Errorf("failed to validate method response structure at index %d: expected at least 2 elements, got %d", i, len(methodResponse))
 		}
 	}
 
@@ -314,13 +314,13 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 // structure is invalid.
 func (fc *FastmailClient) validateMethodResponse(response *MaskedEmailResponse, index int, minElements int) error {
 	if len(response.MethodResponses) == 0 {
-		return fmt.Errorf("invalid response structure: MethodResponses is empty")
+		return fmt.Errorf("failed to validate response structure: MethodResponses is empty")
 	}
 	if index >= len(response.MethodResponses) {
-		return fmt.Errorf("invalid response structure: method response index %d out of range (have %d responses)", index, len(response.MethodResponses))
+		return fmt.Errorf("failed to validate response structure: method response index %d out of range (have %d responses)", index, len(response.MethodResponses))
 	}
 	if len(response.MethodResponses[index]) < minElements {
-		return fmt.Errorf("invalid response structure: method response at index %d has %d elements, expected at least %d", index, len(response.MethodResponses[index]), minElements)
+		return fmt.Errorf("failed to validate response structure: method response at index %d has %d elements, expected at least %d", index, len(response.MethodResponses[index]), minElements)
 	}
 	return nil
 }
@@ -378,7 +378,7 @@ func (fc *FastmailClient) parseUpdatedAlias(response *MaskedEmailResponse, alias
 	}
 
 	if _, ok := updateResponse.Updated[aliasID]; !ok {
-		return fmt.Errorf("server did not confirm the update")
+		return fmt.Errorf("failed to update alias: server did not confirm the update")
 	}
 
 	return nil
@@ -424,7 +424,7 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 	fmt.Printf("Setting '%s' for '%s' to '%s'\n", alias.Email, alias.ForDomain, state)
 
 	if state == alias.State {
-		return fmt.Errorf("'%s' is already '%s'", alias.Email, state)
+		return fmt.Errorf("failed to update alias: '%s' is already '%s'", alias.Email, state)
 	}
 
 	update := map[string]interface{}{

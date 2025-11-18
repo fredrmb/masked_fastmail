@@ -260,7 +260,7 @@ func handleAliasLookupOrCreation(client *FastmailClient, identifier string) erro
 // copyToClipboard attempts to copy the given text to the system clipboard
 func copyToClipboard(text string) error {
 	if err := clipboard.WriteAll(text); err != nil {
-		return fmt.Errorf("clipboard operation failed: %w", err)
+		return fmt.Errorf("failed to copy to clipboard: %w", err)
 	}
 	return nil
 }

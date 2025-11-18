@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -151,6 +152,11 @@ Requires FASTMAIL_ACCOUNT_ID and FASTMAIL_API_KEY environment variables to be se
 	}
 }
 
+// isTestMode returns true if the code is running under go test
+func isTestMode() bool {
+	return flag.Lookup("test.v") != nil
+}
+
 // selectPreferredAlias selects the best alias based on state priority
 // Priority order: enabled > pending > disabled > deleted
 // Returns nil if the input slice is empty.
@@ -162,8 +168,10 @@ func selectPreferredAlias(aliases []MaskedEmailInfo) *MaskedEmailInfo {
 	// Validate all states are recognized
 	for _, alias := range aliases {
 		if _, ok := statePriority[alias.State]; !ok {
-			// Log warning but continue with known states
-			fmt.Fprintf(os.Stderr, "Warning: unknown alias state: %s\n", alias.State)
+			// Log warning but continue with known states (suppress during tests)
+			if !isTestMode() {
+				fmt.Fprintf(os.Stderr, "Warning: unknown alias state: %s\n", alias.State)
+			}
 		}
 	}
 

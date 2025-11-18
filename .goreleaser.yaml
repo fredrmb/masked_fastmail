@@ -22,7 +22,7 @@ builds:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
 
 archives:
-  - format: tar.gz
+  - formats: tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -34,7 +34,7 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats: zip
 
 changelog:
   sort: asc
@@ -42,7 +42,7 @@ changelog:
     - title: Features
       regexp: "^feat:"
       order: 0
-    - title: Bug fixes
+    - title: Fixes
       regexp: "^fix:"
       order: 1
     - title: Others

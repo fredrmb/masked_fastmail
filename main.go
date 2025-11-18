@@ -159,7 +159,7 @@ func handleAliasCreation(client *FastmailClient, identifier string) error {
 
 	if selectedAlias == nil {
 		// Create new alias
-		fmt.Printf("No aliases found for %s, creating new one...\n", identifier)
+		fmt.Printf("No alias found for %s, creating new one...\n", identifier)
 		newAlias, err := client.CreateAlias(identifier)
 		if err != nil {
 			return fmt.Errorf("failed to create alias: %w", err)

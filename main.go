@@ -52,6 +52,7 @@ Requires FASTMAIL_ACCOUNT_ID and FASTMAIL_API_KEY environment variables to be se
 	rootCmd.Flags().BoolP("enable", "e", false, "enable alias")
 	rootCmd.Flags().BoolP("disable", "d", false, "disable alias (send to trash)")
 	rootCmd.Flags().Bool("delete", false, "delete alias (bounce messages)")
+	rootCmd.Flags().Bool("debug", false, "enable debug output (shows raw API requests and responses)")
 
 	// Make flags mutually exclusive
 	rootCmd.MarkFlagsMutuallyExclusive("enable", "disable", "delete")
@@ -104,7 +105,8 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 
 	// Note: We can remove this validation since we're using cobra's MarkFlagsMutuallyExclusive
 
-	client, err := NewFastmailClient()
+	debug, _ := cmd.Flags().GetBool("debug")
+	client, err := NewFastmailClient(debug)
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}

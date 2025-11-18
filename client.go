@@ -27,6 +27,7 @@ var ErrUpdateFailed = errors.New("failed to update alias")
 type FastmailClient struct {
 	AccountID string
 	Token     string
+	Debug     bool
 }
 
 // getMaskedEmail performs a MaskedEmail/get request with the given properties
@@ -131,7 +132,7 @@ func (fc *FastmailClient) buildRequest(calls ...methodCall) *MaskedEmailRequest 
 
 // NewFastmailClient creates a new client for interacting with the Fastmail API.
 // It requires FASTMAIL_ACCOUNT_ID and FASTMAIL_API_KEY environment variables to be set.
-func NewFastmailClient() (*FastmailClient, error) {
+func NewFastmailClient(debug bool) (*FastmailClient, error) {
 	accountID := os.Getenv("FASTMAIL_ACCOUNT_ID")
 	token := os.Getenv("FASTMAIL_API_KEY")
 
@@ -145,6 +146,7 @@ func NewFastmailClient() (*FastmailClient, error) {
 	return &FastmailClient{
 		AccountID: accountID,
 		Token:     token,
+		Debug:     debug,
 	}, nil
 }
 
@@ -152,6 +154,14 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
+	}
+
+	if fc.Debug {
+		fmt.Fprintf(os.Stderr, "DEBUG: Request URL: %s\n", apiURL)
+		fmt.Fprintf(os.Stderr, "DEBUG: Request Headers:\n")
+		fmt.Fprintf(os.Stderr, "  Content-Type: application/json\n")
+		fmt.Fprintf(os.Stderr, "  Authorization: Bearer %s\n", fc.Token)
+		fmt.Fprintf(os.Stderr, "DEBUG: Request Body:\n%s\n", string(jsonPayload))
 	}
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonPayload))
@@ -174,10 +184,26 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 		return nil, err
 	}
 
+	if fc.Debug {
+		fmt.Fprintf(os.Stderr, "DEBUG: Response Status: %s (%d)\n", resp.Status, resp.StatusCode)
+		fmt.Fprintf(os.Stderr, "DEBUG: Response Headers:\n")
+		for key, values := range resp.Header {
+			for _, value := range values {
+				fmt.Fprintf(os.Stderr, "  %s: %s\n", key, value)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "DEBUG: Response Body:\n%s\n", string(body))
+	}
+
+	// Check HTTP status code before attempting to unmarshal JSON
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("HTTP error %d: %s\nResponse body: %s", resp.StatusCode, resp.Status, string(body))
+	}
+
 	var result MaskedEmailResponse
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal JSON response: %w\nResponse body: %s", err, string(body))
 	}
 
 	return &result, nil

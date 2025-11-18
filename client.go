@@ -27,6 +27,28 @@ const (
 // ErrAliasNotFound is returned when an alias cannot be found
 var ErrAliasNotFound = errors.New("alias not found")
 
+// APIError represents an error from the Fastmail API
+type APIError struct {
+	// StatusCode is the HTTP status code (0 if not applicable)
+	StatusCode int
+	// Type is the JMAP error type (empty for HTTP errors)
+	Type string
+	// Message is the error message
+	Message string
+	// ResponseBody is the raw response body for debugging
+	ResponseBody string
+}
+
+func (e *APIError) Error() string {
+	if e.StatusCode > 0 {
+		return fmt.Sprintf("API error (HTTP %d): %s", e.StatusCode, e.Message)
+	}
+	if e.Type != "" {
+		return fmt.Sprintf("API error (%s): %s", e.Type, e.Message)
+	}
+	return fmt.Sprintf("API error: %s", e.Message)
+}
+
 type FastmailClient struct {
 	AccountID string
 	Token     string
@@ -231,7 +253,11 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 
 	// Check HTTP status code before attempting to unmarshal JSON
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("HTTP error %d: %s\nResponse body: %s", resp.StatusCode, resp.Status, string(body))
+		return nil, &APIError{
+			StatusCode:   resp.StatusCode,
+			Message:      fmt.Sprintf("%s\nResponse body: %s", resp.Status, string(body)),
+			ResponseBody: string(body),
+		}
 	}
 
 	// Check for empty response body
@@ -267,7 +293,10 @@ func redactToken(token string) string {
 func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) error {
 	// Check for top-level methodErrors
 	if len(response.MethodErrors) > 0 {
-		return fmt.Errorf("failed to process JMAP response: method errors: %v", response.MethodErrors)
+		return &APIError{
+			Type:    "methodError",
+			Message: fmt.Sprintf("JMAP method errors in response: %v", response.MethodErrors),
+		}
 	}
 
 	// Check if MethodResponses is empty
@@ -293,12 +322,22 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 			if len(methodResponse) > 1 {
 				var jmapError JMAPError
 				if err := json.Unmarshal(methodResponse[1], &jmapError); err == nil {
-					return fmt.Errorf("JMAP error: %s - %s", jmapError.Type, jmapError.Message)
+					return &APIError{
+						Type:    jmapError.Type,
+						Message: jmapError.Message,
+					}
 				}
 				// If we can't parse the error structure, return the raw JSON
-				return fmt.Errorf("JMAP error in method '%s': %s", methodName, string(methodResponse[1]))
+				return &APIError{
+					Type:        "unknown",
+					Message:     fmt.Sprintf("JMAP error in method '%s': %s", methodName, string(methodResponse[1])),
+					ResponseBody: string(methodResponse[1]),
+				}
 			}
-			return fmt.Errorf("JMAP error in method '%s'", methodName)
+			return &APIError{
+				Type:    "unknown",
+				Message: fmt.Sprintf("JMAP error in method '%s'", methodName),
+			}
 		}
 
 		// Validate that the response has at least method name and response data

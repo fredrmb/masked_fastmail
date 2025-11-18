@@ -4,8 +4,7 @@ package main
 
 // Version information embedded at build time by GitHub Actions
 var (
-	embeddedVersion = "dev"
-	embeddedCommit  = "none"
-	embeddedDate    = "unknown"
+  embeddedVersion = "v0.2.0-alpha"
+  embeddedCommit  = "798a5f5"
+  embeddedDate    = "2025-11-18T08:45:53Z"
 )
-

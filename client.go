@@ -55,8 +55,8 @@ func (fc *FastmailClient) getMaskedEmail(properties []string) ([]MaskedEmailInfo
 	}
 
 	// Validate response structure before accessing
-	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
-		return nil, fmt.Errorf("invalid response structure: missing method response data")
+	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+		return nil, err
 	}
 
 	var responseData struct {
@@ -297,6 +297,22 @@ func (fc *FastmailClient) validateJMAPResponse(response *MaskedEmailResponse) er
 	return nil
 }
 
+// validateMethodResponse validates that a specific method response in the JMAP response
+// has the expected structure before accessing it. Returns an error if the response
+// structure is invalid.
+func (fc *FastmailClient) validateMethodResponse(response *MaskedEmailResponse, index int, minElements int) error {
+	if len(response.MethodResponses) == 0 {
+		return fmt.Errorf("invalid response structure: MethodResponses is empty")
+	}
+	if index >= len(response.MethodResponses) {
+		return fmt.Errorf("invalid response structure: method response index %d out of range (have %d responses)", index, len(response.MethodResponses))
+	}
+	if len(response.MethodResponses[index]) < minElements {
+		return fmt.Errorf("invalid response structure: method response at index %d has %d elements, expected at least %d", index, len(response.MethodResponses[index]), minElements)
+	}
+	return nil
+}
+
 func (fc *FastmailClient) GetAliases(domain string) ([]MaskedEmailInfo, error) {
 	maskedEmails, err := fc.getMaskedEmail([]string{"email", "forDomain", "state"})
 	if err != nil {
@@ -327,8 +343,8 @@ func (fc *FastmailClient) CreateAlias(domain string) (*MaskedEmailInfo, error) {
 	}
 
 	// Validate response structure before accessing
-	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
-		return nil, fmt.Errorf("invalid response structure: missing method response data")
+	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+		return nil, err
 	}
 
 	var createdAlias struct {
@@ -385,8 +401,8 @@ func (fc *FastmailClient) UpdateAliasStatus(alias *MaskedEmailInfo, state AliasS
 	}
 
 	// Validate response structure before accessing
-	if len(response.MethodResponses) == 0 || len(response.MethodResponses[0]) < 2 {
-		return fmt.Errorf("invalid response structure: missing method response data")
+	if err := fc.validateMethodResponse(response, 0, 2); err != nil {
+		return err
 	}
 
 	// Verify the update was successful

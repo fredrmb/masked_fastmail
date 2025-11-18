@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -202,6 +203,11 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 
 // handleStateUpdate manages the state changes of existing aliases
 func handleStateUpdate(client *FastmailClient, identifier string, enable, disable, delete bool) error {
+	email, err := normalizeEmailInput(identifier)
+	if err != nil {
+		return err
+	}
+
 	var newState AliasState
 	switch {
 	case enable:
@@ -213,29 +219,28 @@ func handleStateUpdate(client *FastmailClient, identifier string, enable, disabl
 	}
 
 	// Get current state
-	targetAlias, err := client.GetAliasByEmail(identifier)
+	targetAlias, err := client.GetAliasByEmail(email)
 	if err != nil {
-		return fmt.Errorf("failed to get alias: %w", err)
+		return formatAPIError("failed to get alias", err)
 	}
 
 	err = client.UpdateAliasStatus(targetAlias, newState)
 	if err != nil {
-		return fmt.Errorf("failed to update alias status: %w", err)
+		return formatAPIError("failed to update alias status", err)
 	}
 	return nil
 }
 
 // handleAliasLookupOrCreation handles alias lookup and creation if needed
 func handleAliasLookupOrCreation(client *FastmailClient, identifier string) error {
-	displayInput := strings.TrimSpace(identifier)
-	normalizedDomain, err := normalizeOrigin(displayInput)
+	displayInput, normalizedDomain, err := prepareDomainInput(identifier)
 	if err != nil {
 		return err
 	}
 
 	aliases, err := client.GetAliases(normalizedDomain)
 	if err != nil {
-		return fmt.Errorf("failed to get aliases: %w", err)
+		return formatAPIError("failed to get aliases", err)
 	}
 	selectedAlias := selectPreferredAlias(aliases)
 
@@ -244,7 +249,7 @@ func handleAliasLookupOrCreation(client *FastmailClient, identifier string) erro
 		fmt.Printf("No alias found for %s, creating new one...\n", normalizedDomain)
 		newAlias, err := client.CreateAlias(normalizedDomain, displayInput)
 		if err != nil {
-			return fmt.Errorf("failed to create alias: %w", err)
+			return formatAPIError("failed to create alias", err)
 		}
 		selectedAlias = newAlias
 	} else if len(aliases) > 1 {
@@ -270,4 +275,25 @@ func copyToClipboard(text string) error {
 		return fmt.Errorf("failed to copy to clipboard: %w", err)
 	}
 	return nil
+}
+
+// formatAPIError augments Fastmail API errors with helpful context so users
+// can understand failures without enabling debug mode.
+func formatAPIError(action string, err error) error {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		switch {
+		case apiErr.StatusCode > 0:
+			body := strings.TrimSpace(apiErr.ResponseBody)
+			if body == "" {
+				body = apiErr.Message
+			}
+			return fmt.Errorf("%s: Fastmail API returned HTTP %d: %s", action, apiErr.StatusCode, body)
+		case apiErr.Type != "":
+			return fmt.Errorf("%s: Fastmail API error (%s): %s", action, apiErr.Type, apiErr.Message)
+		default:
+			return fmt.Errorf("%s: Fastmail API error: %s", action, apiErr.Message)
+		}
+	}
+	return fmt.Errorf("%s: %w", action, err)
 }

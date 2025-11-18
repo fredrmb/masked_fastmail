@@ -126,6 +126,25 @@ vhs cassette.tape
 
 This will generate a new `demo.gif` file based on the commands in `cassette.tape`.
 
+### Publishing a release
+
+Releases are automatically built and published using [GoReleaser](https://goreleaser.com/) via GitHub Actions when a version tag is pushed.
+
+To create a new release:
+
+1. Create and push a version tag (must follow semantic versioning):
+   ```shell
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+2. The GitHub workflow will automatically:
+   - Build binaries for Linux, Windows, and macOS (amd64 and arm64)
+   - Create a GitHub release with the changelog
+   - Attach all build artifacts to the release
+
+Tag format: `vMAJOR.MINOR.PATCH` (e.g., `v1.0.0`). Pre-release tags are also supported (e.g., `v1.0.0-alpha`).
+
 ## License
 
 BSD 3-Clause License

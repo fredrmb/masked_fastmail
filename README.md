@@ -15,7 +15,7 @@ Easily create new aliases for websites and manage existing ones.
 
 ## Usage
 
-![demo](https://raw.githubusercontent.com/fredrikrab/masked_fastmail/main/demo.gif)
+![demo](https://raw.githubusercontent.com/fredrmb/masked_fastmail/main/demo.gif)
 
 ```text
 Usage:
@@ -72,12 +72,12 @@ masked_fastmail --disable user.1234@fastmail.com
 
 ### Option 1: Download a pre-built binary
 
-Download the latest release from the [releases page](https://github.com/fredrikrab/masked_fastmail/releases/latest).
+Download the latest release from the [releases page](https://github.com/fredrmb/masked_fastmail/releases/latest).
 
 ### Option 2: Use `go install`
 
 ```shell
-go install github.com/fredrikrab/masked_fastmail@latest
+go install github.com/fredrmb/masked_fastmail@latest
 ```
 
 ### Option 3: Build from source

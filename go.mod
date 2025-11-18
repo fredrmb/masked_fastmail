@@ -1,4 +1,4 @@
-module github.com/fredrikrab/masked_fastmail
+module github.com/fredrmb/masked_fastmail
 
 go 1.22.9
 

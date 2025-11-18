@@ -68,6 +68,17 @@ This causes all new new emails to be moved to trash.
 masked_fastmail --disable user.1234@fastmail.com
 ```
 
+### How domains are normalized
+
+When you pass a URL or domain, the CLI normalizes it before talking to Fastmail:
+
+- Paths, query strings, ports, and fragments are dropped (only scheme + host remain).
+- `https://` is assumed if you omit the scheme; `http://` is preserved if you specify it.
+- Host names are lower-cased and trailing dots/slashes are removed.
+- Subdomains stay distinct (`shop.example.com` is different from `example.com`).
+
+The normalized value is stored in Fastmail's `forDomain` and `description` fields so lookups consistently match.
+
 ## Installation
 
 ### Option 1: Download a pre-built binary

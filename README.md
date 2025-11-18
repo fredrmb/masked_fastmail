@@ -80,10 +80,18 @@ Download the latest release from the [releases page](https://github.com/fredrmb/
 go install github.com/fredrmb/masked_fastmail@latest
 ```
 
+When installed via `go install`, version information is automatically extracted from Go's build metadata. You can verify the installation and check the version by running:
+
+```shell
+masked_fastmail --version
+```
+
+The binary will be installed to `$GOBIN` (or `$GOPATH/bin`, or `~/go/bin` if neither is set). Make sure this directory is in your `PATH`.
+
 ### Option 3: Build from source
 
 1. Clone the repository
-2. Run `go build -o masked_fastmail`
+2. Run `./build.sh` (includes version information) or `go build -o masked_fastmail`
 
 #### Prerequisites
 
@@ -107,8 +115,16 @@ go install github.com/fredrmb/masked_fastmail@latest
 Build the binary:
 
 ```shell
+./build.sh
+```
+
+Or build without version information:
+
+```shell
 go build -o masked_fastmail
 ```
+
+The `build.sh` script automatically sets version information from git (version tag, commit hash, and build date), which will be displayed when running `./masked_fastmail --version`.
 
 Run with debug output to see raw API requests and responses:
 

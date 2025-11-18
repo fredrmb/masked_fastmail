@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
+	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
@@ -15,6 +17,45 @@ var (
 	date    = "unknown"
 )
 
+// initVersionInfo attempts to populate version information from Go's build info
+// when installed via `go install`. This is a fallback when ldflags are not set.
+func initVersionInfo() {
+	// If version was set via ldflags (not defaults), use those values
+	if version != "dev" || commit != "none" || date != "unknown" {
+		return
+	}
+
+	// Try to get version info from Go's build info (available when installed via go install)
+	if info, ok := debug.ReadBuildInfo(); ok {
+		// Extract version from module path
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+
+		// Extract commit hash and build time from build settings
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				if setting.Value != "" {
+					// Use short commit hash (first 7 characters)
+					if len(setting.Value) >= 7 {
+						commit = setting.Value[:7]
+					} else {
+						commit = setting.Value
+					}
+				}
+			case "vcs.time":
+				if setting.Value != "" {
+					// Parse and format the time
+					if t, err := time.Parse(time.RFC3339, setting.Value); err == nil {
+						date = t.Format("2006-01-02T15:04:05Z")
+					}
+				}
+			}
+		}
+	}
+}
+
 // statePriority defines the precedence of alias states for selection
 var statePriority = map[AliasState]int{
 	AliasEnabled:  0,
@@ -24,6 +65,9 @@ var statePriority = map[AliasState]int{
 }
 
 func main() {
+	// Initialize version info from build info if ldflags weren't set
+	initVersionInfo()
+
 	rootCmd := &cobra.Command{
 		Use: `masked_fastmail <url>   (no flags)
   manage_fastmail <alias>`,

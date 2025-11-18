@@ -192,7 +192,7 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 		fmt.Fprintf(os.Stderr, "DEBUG: Request URL: %s\n", apiURL)
 		fmt.Fprintf(os.Stderr, "DEBUG: Request Headers:\n")
 		fmt.Fprintf(os.Stderr, "  Content-Type: application/json\n")
-		fmt.Fprintf(os.Stderr, "  Authorization: Bearer %s\n", fc.Token)
+		fmt.Fprintf(os.Stderr, "  Authorization: Bearer %s\n", redactToken(fc.Token))
 		fmt.Fprintf(os.Stderr, "DEBUG: Request Body:\n%s\n", string(jsonPayload))
 	}
 
@@ -248,6 +248,16 @@ func (fc *FastmailClient) sendRequest(payload *MaskedEmailRequest) (*MaskedEmail
 	}
 
 	return &result, nil
+}
+
+// redactToken returns a redacted version of the token showing only the last 4 characters.
+// Format: "[redacted token]...1234"
+func redactToken(token string) string {
+	// If the token is shorter than 4 characters, return the token as is
+	if len(token) <= 4 {
+		return token
+	}
+	return "[redacted token]..." + token[len(token)-4:]
 }
 
 // validateJMAPResponse checks for JMAP errors in the response

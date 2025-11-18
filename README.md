@@ -12,6 +12,7 @@ Easily create new aliases for websites and manage existing ones.
 - Get or create masked email addresses for domains
 - Aliases are automatically copied to clipboard
 - Enable, disable and delete aliases
+- List existing aliases for a domain without creating new ones
 
 ## Usage
 
@@ -26,6 +27,7 @@ Flags:
       --delete    delete alias (bounce messages)
   -d, --disable   disable alias (send to trash)
   -e, --enable    enable alias
+  -l, --list      list aliases for a domain without creating anything
   -h, --help      show this message
   -v, --version   show version information
 ```
@@ -66,6 +68,14 @@ This causes all new new emails to be moved to trash.
 
 ```shell
 masked_fastmail --disable user.1234@fastmail.com
+```
+
+#### List aliases for a domain
+
+Prints all known aliases for the site without creating a new one or copying to the clipboard.
+
+```shell
+masked_fastmail --list example.com
 ```
 
 ### How domains are normalized

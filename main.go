@@ -132,9 +132,11 @@ Requires FASTMAIL_ACCOUNT_ID and FASTMAIL_API_KEY environment variables to be se
 	rootCmd.Flags().BoolP("disable", "d", false, "disable alias (send to trash)")
 	rootCmd.Flags().Bool("delete", false, "delete alias (bounce messages)")
 	rootCmd.Flags().Bool("debug", false, "enable debug output (shows raw API requests and responses)")
+	rootCmd.Flags().BoolP("list", "l", false, "list all aliases for a domain without creating new ones")
 
 	// Make flags mutually exclusive
 	rootCmd.MarkFlagsMutuallyExclusive("enable", "disable", "delete")
+	rootCmd.MarkFlagsMutuallyExclusive("list", "enable", "disable", "delete")
 
 	// Add completion support
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
@@ -194,9 +196,13 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 	enable, _ := cmd.Flags().GetBool("enable")
 	disable, _ := cmd.Flags().GetBool("disable")
 	delete, _ := cmd.Flags().GetBool("delete")
+	list, _ := cmd.Flags().GetBool("list")
 
 	if enable || disable || delete {
 		return handleStateUpdate(client, identifier, enable, disable, delete)
+	}
+	if list {
+		return handleAliasList(client, identifier)
 	}
 	return handleAliasLookupOrCreation(client, identifier)
 }
@@ -228,6 +234,36 @@ func handleStateUpdate(client *FastmailClient, identifier string, enable, disabl
 	if err != nil {
 		return formatAPIError("failed to update alias status", err)
 	}
+	return nil
+}
+
+// handleAliasList prints metadata for all aliases associated with a domain
+// without creating or modifying anything.
+func handleAliasList(client *FastmailClient, identifier string) error {
+	displayInput, normalizedDomain, err := prepareDomainInput(identifier)
+	if err != nil {
+		return err
+	}
+
+	aliases, err := client.GetAliases(normalizedDomain)
+	if err != nil {
+		return formatAPIError("failed to list aliases", err)
+	}
+
+	if len(aliases) == 0 {
+		fmt.Printf("No aliases found for %s\n", displayInput)
+		return nil
+	}
+
+	fmt.Printf("Aliases for %s:\n", normalizedDomain)
+	for _, alias := range aliases {
+		description := alias.Description
+		if strings.TrimSpace(description) == "" {
+			description = "(no description)"
+		}
+		fmt.Printf("- %s  state: %s  description: %s\n", alias.Email, alias.State, description)
+	}
+
 	return nil
 }
 

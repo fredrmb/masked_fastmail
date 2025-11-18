@@ -77,6 +77,30 @@ func TestPrepareDomainInput(t *testing.T) {
 	}
 }
 
+func TestHostFromOrigin(t *testing.T) {
+	if host := hostFromOrigin("https://Sub.Example.com/login"); host != "sub.example.com" {
+		t.Fatalf("unexpected host %q", host)
+	}
+
+	if host := hostFromOrigin("example.com"); host != "example.com" {
+		t.Fatalf("expected bare domain to yield host, got %q", host)
+	}
+}
+
+func TestIsSubdomain(t *testing.T) {
+	if !isSubdomain("sub.example.com", "example.com") {
+		t.Fatalf("expected subdomain to match")
+	}
+
+	if isSubdomain("example.com", "example.com") {
+		t.Fatalf("root domain should not be treated as subdomain")
+	}
+
+	if isSubdomain("other.com", "example.com") {
+		t.Fatalf("different domains should not match")
+	}
+}
+
 func TestNormalizeEmailInput(t *testing.T) {
 	email, err := normalizeEmailInput(" user@example.com ")
 	if err != nil {

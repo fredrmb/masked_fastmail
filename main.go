@@ -106,7 +106,7 @@ func main() {
 	initVersionInfo()
 
 	rootCmd := &cobra.Command{
-		Use: `masked_fastmail <url>   (no flags)
+		Use: `masked_fastmail <url> "description"	(description is optional)
   manage_fastmail <alias>`,
 		Short: "Manage masked email aliases",
 		Long: `A command-line tool to manage Fastmail.com masked email addresses.
@@ -135,10 +135,12 @@ Requires FASTMAIL_ACCOUNT_ID and FASTMAIL_API_KEY environment variables to be se
 	rootCmd.Flags().Bool("delete", false, "delete alias (bounce messages)")
 	rootCmd.Flags().Bool("debug", false, "enable debug output (shows raw API requests and responses)")
 	rootCmd.Flags().BoolP("list", "l", false, "list all aliases for a domain without creating new ones")
+	rootCmd.Flags().String("set-description", "", "update the description for an alias")
 
 	// Make flags mutually exclusive
 	rootCmd.MarkFlagsMutuallyExclusive("enable", "disable", "delete")
-	rootCmd.MarkFlagsMutuallyExclusive("list", "enable", "disable", "delete")
+	rootCmd.MarkFlagsMutuallyExclusive("list", "enable", "disable", "delete", "set-description")
+	rootCmd.MarkFlagsMutuallyExclusive("set-description", "enable", "disable", "delete")
 
 	// Add completion support
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
@@ -189,8 +191,8 @@ func getStatePriority(state AliasState) int {
 // runMaskedFastmail is the main command handler for the CLI application.
 // It handles both alias creation/lookup and state management operations.
 func runMaskedFastmail(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("exactly one URL or alias must be specified\n\n%s", cmd.UsageString())
+	if len(args) == 0 || len(args) > 2 {
+		return fmt.Errorf("specify a domain/alias, optionally followed by a description\n\n%s", cmd.UsageString())
 	}
 
 	debug, _ := cmd.Flags().GetBool("debug")
@@ -200,12 +202,31 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 	}
 
 	identifier := args[0]
+	var descriptionArg *string
+	if len(args) == 2 {
+		desc := args[1]
+		descriptionArg = &desc
+	}
 
 	// Check for state update flags
 	enable, _ := cmd.Flags().GetBool("enable")
 	disable, _ := cmd.Flags().GetBool("disable")
 	delete, _ := cmd.Flags().GetBool("delete")
 	list, _ := cmd.Flags().GetBool("list")
+	newDescriptionValue, _ := cmd.Flags().GetString("set-description")
+	setDescription := cmd.Flags().Changed("set-description")
+
+	requiresSingleArg := enable || disable || delete || list || setDescription
+	if requiresSingleArg && len(args) != 1 {
+		return fmt.Errorf("this operation accepts exactly one identifier (alias or domain)")
+	}
+	if descriptionArg != nil && requiresSingleArg {
+		return fmt.Errorf("the positional description argument is only allowed when creating or looking up aliases without flags")
+	}
+
+	if setDescription {
+		return handleDescriptionUpdate(client, identifier, newDescriptionValue)
+	}
 
 	if enable || disable || delete {
 		return handleStateUpdate(client, identifier, enable, disable, delete)
@@ -213,7 +234,7 @@ func runMaskedFastmail(cmd *cobra.Command, args []string) error {
 	if list {
 		return handleAliasList(client, identifier)
 	}
-	return handleAliasLookupOrCreation(client, identifier)
+	return handleAliasLookupOrCreation(client, identifier, descriptionArg)
 }
 
 // handleStateUpdate manages the state changes of existing aliases
@@ -254,60 +275,97 @@ func handleAliasList(client *FastmailClient, identifier string) error {
 		return err
 	}
 
-	aliases, err := client.GetAliases(normalizedDomain)
+	aliases, err := client.FetchAllAliases()
 	if err != nil {
 		return formatAPIError("failed to list aliases", err)
 	}
 
-	if len(aliases) == 0 {
-		fmt.Printf("No aliases found for %s\n", displayInput)
+	matching, related := filterAliasesForList(aliases, normalizedDomain, displayInput)
+	if len(matching) == 0 && len(related) == 0 {
+		fmt.Printf("No aliases found matching %s\n", displayInput)
 		return nil
 	}
-
-	fmt.Printf("Aliases for %s:\n", normalizedDomain)
 
 	type aliasRow struct {
 		email       string
 		state       string
+		url         string
 		description string
 	}
 
-	rows := make([]aliasRow, 0, len(aliases))
+	buildRows := func(in []MaskedEmailInfo) []aliasRow {
+		rows := make([]aliasRow, 0, len(in))
+		for _, alias := range in {
+			description := alias.Description
+			if strings.TrimSpace(description) == "" {
+				description = "(no description)"
+			}
+			url := strings.TrimSpace(alias.ForDomain)
+			if url == "" {
+				url = "(unknown domain)"
+			}
+			rows = append(rows, aliasRow{
+				email:       alias.Email,
+				state:       string(alias.State),
+				url:         url,
+				description: description,
+			})
+		}
+		return rows
+	}
+
+	matchingRows := buildRows(matching)
+	relatedRows := buildRows(related)
+	allRows := append(append([]aliasRow{}, matchingRows...), relatedRows...)
 	maxEmailWidth := 0
-	maxStateWidth := 0
 
-	for _, alias := range aliases {
-		description := alias.Description
-		if strings.TrimSpace(description) == "" {
-			description = "(no description)"
-		}
-
-		row := aliasRow{
-			email:       alias.Email,
-			state:       string(alias.State),
-			description: description,
-		}
-		rows = append(rows, row)
-
+	for _, row := range allRows {
 		if emailWidth := utf8.RuneCountInString(row.email); emailWidth > maxEmailWidth {
 			maxEmailWidth = emailWidth
 		}
-		if stateWidth := utf8.RuneCountInString(row.state); stateWidth > maxStateWidth {
-			maxStateWidth = stateWidth
+	}
+
+	firstLineFormat := fmt.Sprintf("- %%-%ds (state: %%s)\n", maxEmailWidth)
+	printRows := func(rows []aliasRow, includeURL bool) {
+		for idx, row := range rows {
+			fmt.Printf(firstLineFormat, row.email, row.state)
+			if includeURL {
+				domainLabel := strings.TrimSpace(row.url)
+				if domainLabel == "" {
+					domainLabel = "(unknown domain)"
+				}
+				fmt.Printf("  Domain:      %s\n", domainLabel)
+			}
+			fmt.Printf("  Description: %s\n", row.description)
+			if idx < len(rows)-1 {
+				fmt.Println()
+			}
 		}
 	}
 
-	format := fmt.Sprintf("- %%-%ds  state: %%-%ds  description: %%s\n", maxEmailWidth, maxStateWidth)
-	for _, row := range rows {
-		fmt.Printf(format, row.email, row.state, row.description)
+	if len(matchingRows) == 0 {
+		fmt.Printf("No aliases found for domain %s\n", normalizedDomain)
+	} else {
+		fmt.Printf("Aliases for %s:\n", normalizedDomain)
+		printRows(matchingRows, false)
+	}
+
+	if len(relatedRows) > 0 {
+		if len(matchingRows) > 0 {
+			fmt.Println()
+		} else {
+			fmt.Println()
+		}
+		fmt.Printf("Additional matches containing %q:\n", strings.TrimSpace(displayInput))
+		printRows(relatedRows, true)
 	}
 
 	return nil
 }
 
 // handleAliasLookupOrCreation handles alias lookup and creation if needed
-func handleAliasLookupOrCreation(client *FastmailClient, identifier string) error {
-	displayInput, normalizedDomain, err := prepareDomainInput(identifier)
+func handleAliasLookupOrCreation(client *FastmailClient, identifier string, description *string) error {
+	_, normalizedDomain, err := prepareDomainInput(identifier)
 	if err != nil {
 		return err
 	}
@@ -318,20 +376,29 @@ func handleAliasLookupOrCreation(client *FastmailClient, identifier string) erro
 	}
 	selectedAlias := selectPreferredAlias(aliases)
 
+	createdNew := false
 	if selectedAlias == nil {
 		// Create new alias
 		fmt.Printf("No alias found for %s, creating new one...\n", normalizedDomain)
-		newAlias, err := client.CreateAlias(normalizedDomain, displayInput)
+		newAlias, err := client.CreateAlias(normalizedDomain, description)
 		if err != nil {
 			return formatAPIError("failed to create alias", err)
 		}
 		selectedAlias = newAlias
+		createdNew = true
 	} else if len(aliases) > 1 {
 		fmt.Printf("Found %d aliases for %s:\n", len(aliases), normalizedDomain)
 		for _, alias := range aliases {
 			fmt.Printf("- %s (state: %s)\n", alias.Email, alias.State)
 		}
 		fmt.Println("\nSelected alias:")
+	}
+
+	if description != nil && !createdNew {
+		trimmed := strings.TrimSpace(*description)
+		if trimmed != "" {
+			fmt.Fprintf(os.Stderr, "Note: description not updated for existing alias. Use --set-description to change it.\n")
+		}
 	}
 
 	fmt.Printf("%s (state: %s)", selectedAlias.Email, selectedAlias.State)
@@ -370,4 +437,115 @@ func formatAPIError(action string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %w", action, err)
+}
+
+// handleDescriptionUpdate updates the description for an existing alias identified by email.
+func handleDescriptionUpdate(client *FastmailClient, identifier string, newDescription string) error {
+	email, err := normalizeEmailInput(identifier)
+	if err != nil {
+		return fmt.Errorf("--set-description requires an alias email address: %w", err)
+	}
+
+	alias, err := client.GetAliasByEmail(email)
+	if err != nil {
+		return formatAPIError("failed to get alias", err)
+	}
+
+	if alias.Description == newDescription {
+		fmt.Println("Description already set to the requested value.")
+		return nil
+	}
+
+	if err := client.UpdateAliasDescription(alias, newDescription); err != nil {
+		return formatAPIError("failed to update alias description", err)
+	}
+
+	fmt.Println("Description updated.")
+	return nil
+}
+
+// filterAliasesForList splits aliases into primary (forDomain matches) and related (search matches).
+func filterAliasesForList(aliases []MaskedEmailInfo, normalizedDomain string, searchInput string) (primary []MaskedEmailInfo, related []MaskedEmailInfo) {
+	needleDomain := strings.ToLower(strings.TrimSpace(normalizedDomain))
+	needleSearch := strings.ToLower(strings.TrimSpace(searchInput))
+	seen := make(map[string]struct{})
+
+	for _, alias := range aliases {
+		if alias.State == AliasDeleted {
+			continue
+		}
+
+		if aliasMatchesDomain(alias, normalizedDomain) {
+			primary = append(primary, alias)
+			if alias.ID != "" {
+				seen[alias.ID] = struct{}{}
+			}
+			continue
+		}
+
+		if aliasMatchesSubdomain(alias, normalizedDomain) {
+			if alias.ID != "" {
+				if _, ok := seen[alias.ID]; ok {
+					continue
+				}
+				seen[alias.ID] = struct{}{}
+			}
+			related = append(related, alias)
+			continue
+		}
+
+		if aliasMatchesSearch(alias, needleDomain, needleSearch) {
+			if alias.ID != "" {
+				if _, ok := seen[alias.ID]; ok {
+					continue
+				}
+				seen[alias.ID] = struct{}{}
+			}
+			related = append(related, alias)
+		}
+	}
+
+	return primary, related
+}
+
+func aliasMatchesSearch(alias MaskedEmailInfo, needles ...string) bool {
+	fields := []string{
+		strings.ToLower(alias.Email),
+		strings.ToLower(alias.Description),
+		strings.ToLower(alias.ForDomain),
+		strings.ToLower(alias.ID),
+	}
+
+	for _, needle := range needles {
+		needle = strings.TrimSpace(needle)
+		if needle == "" {
+			continue
+		}
+		for _, field := range fields {
+			if field != "" && strings.Contains(field, needle) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func aliasMatchesSubdomain(alias MaskedEmailInfo, targetDomain string) bool {
+	targetHost := hostFromOrigin(targetDomain)
+	if targetHost == "" {
+		return false
+	}
+
+	candidate := alias.ForDomain
+	if strings.TrimSpace(candidate) == "" {
+		candidate = alias.Description
+	}
+
+	aliasHost := hostFromOrigin(candidate)
+	if aliasHost == "" {
+		return false
+	}
+
+	return isSubdomain(aliasHost, targetHost)
 }

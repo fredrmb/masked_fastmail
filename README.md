@@ -21,7 +21,7 @@ Easily create new aliases for websites and manage existing ones.
 
 ```text
 Usage:
-  masked_fastmail <url>   (no flags)
+  masked_fastmail <url> "description"	(description is optional)
   manage_fastmail <alias> [flags]
 
 Flags:
@@ -29,6 +29,8 @@ Flags:
   -d, --disable   disable alias (send to trash)
   -e, --enable    enable alias
   -l, --list      list aliases for a domain without creating anything
+      --set-description string
+                   update the description for an existing alias
   -h, --help      show this message
   -v, --version   show version information
 ```
@@ -53,6 +55,14 @@ In either case, the alias is automatically copied to the clipboard.[^1]
 masked_fastmail example.com
 ```
 
+You can optionally supply a description. Quotes are passed straight through the shell, so all characters are preserved:
+
+```shell
+masked_fastmail example.com "Shopping account at Example"
+```
+
+Descriptions supplied with an existing alias will be ignored to avoid accidental overwrites. Use `--set-description` if you intend to update an existing alias.
+
 #### Enable an existing alias
 
 New Fastmail aliases are initialized to `pending`, and are set to `enabled` once they receive their first email.
@@ -73,22 +83,31 @@ masked_fastmail --disable user.1234@fastmail.com
 
 #### List aliases for a domain
 
-Prints all known aliases for the site without creating a new one or copying to the clipboard.
+Prints all known aliases for the site without creating a new one or copying to the clipboard. Results whose `forDomain` matches the normalized input are listed first, followed by aliases where the search text appears in the `email`, `description`, or `forDomain` fields.
 
 ```shell
 masked_fastmail --list example.com
+```
+
+#### Update an alias description
+
+Descriptions can only be updated explicitly to avoid accidental changes. Pass the alias email plus the new description:
+
+```shell
+masked_fastmail user.1234@fastmail.com --set-description "Personal finance login"
 ```
 
 ### How domains are normalized
 
 When you pass a URL or domain, the CLI normalizes it before talking to Fastmail:
 
-- Paths, query strings, ports, and fragments are dropped (only scheme + host remain).
-- `https://` is assumed if you omit the scheme; `http://` is preserved if you specify it.
-- Host names are lower-cased and trailing dots/slashes are removed.
-- Subdomains stay distinct (`shop.example.com` is different from `example.com`).
+- Paths, query strings, ports, and fragments are dropped (only scheme + host remain)
+- `https://` is assumed if you omit the scheme; `http://` is preserved if you specify it
+- Host names are lower-cased and trailing dots/slashes are removed
+  - In other words, `https://example.com`, `example.com`, `https://EXAMPLE.com/login` and `example.com/login` are all treated as equal
+- Subdomains stay distinct (`shop.example.com` is different from `example.com`)
 
-The normalized value is stored in Fastmail's `forDomain` and `description` fields so lookups consistently match.
+The normalized value is stored in Fastmail's `forDomain` field. The `description` field is only populated with text you explicitly (and optionally) provide.
 
 ## Installation
 

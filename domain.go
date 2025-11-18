@@ -94,3 +94,48 @@ func normalizeEmailInput(input string) (string, error) {
 func looksLikeEmail(input string) bool {
 	return strings.Count(input, "@") == 1 && !strings.ContainsAny(input, " \t")
 }
+
+func hostFromOrigin(input string) string {
+	normalized, err := normalizeOrigin(input)
+	if err != nil {
+		return looseHostname(input)
+	}
+
+	parts := strings.SplitN(normalized, "://", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+
+	return strings.ToLower(strings.TrimSpace(parts[1]))
+}
+
+func looseHostname(input string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(input))
+	trimmed = strings.TrimSuffix(trimmed, "/")
+	trimmed = strings.TrimSuffix(trimmed, ".")
+	switch {
+	case strings.HasPrefix(trimmed, "http://"):
+		trimmed = strings.TrimPrefix(trimmed, "http://")
+	case strings.HasPrefix(trimmed, "https://"):
+		trimmed = strings.TrimPrefix(trimmed, "https://")
+	}
+	if idx := strings.Index(trimmed, "/"); idx != -1 {
+		trimmed = trimmed[:idx]
+	}
+	return strings.TrimSpace(trimmed)
+}
+
+func isSubdomain(candidateHost, rootHost string) bool {
+	candidate := strings.ToLower(strings.TrimSpace(candidateHost))
+	root := strings.ToLower(strings.TrimSpace(rootHost))
+
+	if candidate == "" || root == "" {
+		return false
+	}
+
+	if candidate == root {
+		return false
+	}
+
+	return strings.HasSuffix(candidate, "."+root)
+}

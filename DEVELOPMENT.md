@@ -2,7 +2,8 @@
 
 ### Prerequisites
 
-- Go 1.22+ (see [Installation](./README#installation) for details)
+- Go 1.22+
+- Fastmail API credentials
 - [VHS](https://github.com/charmbracelet/vhs) (for generating demo GIF)
 
 ### Building and running

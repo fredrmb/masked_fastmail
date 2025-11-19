@@ -68,11 +68,6 @@ The binary will be installed to `$GOBIN` (or `$GOPATH/bin`, or `~/go/bin` if nei
 1. Clone the repository
 2. Run `./build.sh` (includes version information) or `go build -o masked_fastmail`
 
-#### Prerequisites
-
-- Go 1.22+
-- Fastmail API credentials
-
 See [DEVELOPMENT.md](./DEVELOPMENT.md) for more information about building, running and using this code.
 
 ## Examples

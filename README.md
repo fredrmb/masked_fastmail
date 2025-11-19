@@ -5,8 +5,7 @@ A simple CLI tool for managing [Fastmail masked email aliases](https://www.fastm
 Easily create new aliases for websites and manage existing ones.
 
 > [!NOTE]
-> This project is still under development and may contain bugs.  
-> It's a personal project and is not in any way affiliated with Fastmail.
+> This is a personal project and is not in any way affiliated with Fastmail.com.
 
 ## Features
 
